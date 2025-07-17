@@ -1,0 +1,410 @@
+{
+  "leads": [
+    {
+      "leadId": "24802285",
+      "priceUsd": 0,
+      "priceEur": 0,
+      "priceRub": 38439,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "21072147",
+      "priceUsd": 445.67,
+      "priceEur": 401.06,
+      "priceRub": 40619,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "26153489",
+      "priceUsd": 449.01,
+      "priceEur": 404.07,
+      "priceRub": 40924,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "25623401",
+      "priceUsd": 399.55,
+      "priceEur": 359.56,
+      "priceRub": 36416,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "25808187",
+      "priceUsd": 440.03,
+      "priceEur": 395.99,
+      "priceRub": 40105,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "19314263",
+      "priceUsd": 461.57,
+      "priceEur": 415.38,
+      "priceRub": 42069,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "20695995",
+      "priceUsd": 450.19,
+      "priceEur": 405.13,
+      "priceRub": 41031,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "20344821",
+      "priceUsd": 535.12,
+      "priceEur": 481.56,
+      "priceRub": 48772,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "21345187",
+      "priceUsd": 417.92,
+      "priceEur": 376.09,
+      "priceRub": 38090,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "19779921",
+      "priceUsd": 483.99,
+      "priceEur": 435.55,
+      "priceRub": 44112,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "22863307",
+      "priceUsd": 477.96,
+      "priceEur": 430.12,
+      "priceRub": 43562,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "21720197",
+      "priceUsd": 406.65,
+      "priceEur": 365.95,
+      "priceRub": 37063,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "25460939",
+      "priceUsd": 371.63,
+      "priceEur": 334.43,
+      "priceRub": 33871,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "22064671",
+      "priceUsd": 368.17,
+      "priceEur": 331.32,
+      "priceRub": 33556,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "22549953",
+      "priceUsd": 410.73,
+      "priceEur": 369.62,
+      "priceRub": 37435,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "26745179",
+      "priceUsd": 1088.99,
+      "priceEur": 980,
+      "priceRub": 99253.322,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "26346393",
+      "priceUsd": 507.2,
+      "priceEur": 456.43,
+      "priceRub": 46227,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "26669021",
+      "priceUsd": 0,
+      "priceEur": 0,
+      "priceRub": 0,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "10498099",
+      "priceUsd": 941.5,
+      "priceEur": 847.27,
+      "priceRub": 85810.47545000001,
+      "currency": "Dollar"
+    },
+    {
+      "leadId": "19141657",
+      "priceUsd": 109.72,
+      "priceEur": 98.74,
+      "priceRub": 10000,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "21072123",
+      "priceUsd": 527.05,
+      "priceEur": 490,
+      "priceRub": 49626.661,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "22064643",
+      "priceUsd": 544.5,
+      "priceEur": 490,
+      "priceRub": 49626.661,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "19314177",
+      "priceUsd": 544.5,
+      "priceEur": 490,
+      "priceRub": 49626.661,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "19779831",
+      "priceUsd": 484.91,
+      "priceEur": 490,
+      "priceRub": 49626.661,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "25971679",
+      "priceUsd": 420.17,
+      "priceEur": 378.11,
+      "priceRub": 38295,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "23306399",
+      "priceUsd": 445.95,
+      "priceEur": 401.32,
+      "priceRub": 40645,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "21145931",
+      "priceUsd": 111.12,
+      "priceEur": 100,
+      "priceRub": 10127.89,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "25205413",
+      "priceUsd": 389.5,
+      "priceEur": 350.52,
+      "priceRub": 35500,
+      "currency": "Рубли"
+    },
+    {
+      "leadId": "22243649",
+      "priceUsd": 2278,
+      "priceEur": 2050,
+      "priceRub": 207621.745,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "25636753",
+      "priceUsd": 2278,
+      "priceEur": 2050,
+      "priceRub": 207621.745,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "20934789",
+      "priceUsd": 195.57,
+      "priceEur": 176,
+      "priceRub": 17825.0864,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "17289801",
+      "priceUsd": 544.5,
+      "priceEur": 490,
+      "priceRub": 49626.661,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "22863133",
+      "priceUsd": 242.39,
+      "priceEur": 220.05,
+      "priceRub": 22286.421945,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "25460933",
+      "priceUsd": 544.5,
+      "priceEur": 490,
+      "priceRub": 49626.661,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "25971663",
+      "priceUsd": 220.02,
+      "priceEur": 198,
+      "priceRub": 20053.2222,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "26346321",
+      "priceUsd": 222.52,
+      "priceEur": 200.25,
+      "priceRub": 20281.099725,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "17751115",
+      "priceUsd": 544.5,
+      "priceEur": 490,
+      "priceRub": 49626.661,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "9911819",
+      "priceUsd": 549,
+      "priceEur": 474.54,
+      "priceRub": 50037.1227,
+      "currency": "Dollar"
+    },
+    {
+      "leadId": "14596315",
+      "priceUsd": 589,
+      "priceEur": 530.05,
+      "priceRub": 53682.8147,
+      "currency": "Dollar"
+    },
+    {
+      "leadId": "23964698",
+      "priceUsd": 221.52,
+      "priceEur": 199.35,
+      "priceRub": 20189.948715,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "25808131",
+      "priceUsd": 1088.99,
+      "priceEur": 980,
+      "priceRub": 99253.322,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "23964662",
+      "priceUsd": 1088.99,
+      "priceEur": 980,
+      "priceRub": 99253.322,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "21720159",
+      "priceUsd": 234.96,
+      "priceEur": 216.45,
+      "priceRub": 21921.817904999996,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "18116713",
+      "priceUsd": 544.5,
+      "priceEur": 490,
+      "priceRub": 49626.661,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "16760103",
+      "priceUsd": 693.6,
+      "priceEur": 605.5,
+      "priceRub": 61324.373949999994,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "24802239",
+      "priceUsd": 740.07,
+      "priceEur": 666,
+      "priceRub": 67451.7474,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "22563205",
+      "priceUsd": 240.52,
+      "priceEur": 216.45,
+      "priceRub": 21921.817904999996,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "21345167",
+      "priceUsd": 1088.99,
+      "priceEur": 980,
+      "priceRub": 99253.322,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "25205361",
+      "priceUsd": 544.5,
+      "priceEur": 490,
+      "priceRub": 49626.661,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "22549943",
+      "priceUsd": 544.5,
+      "priceEur": 490,
+      "priceRub": 49626.661,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "19314153",
+      "priceUsd": 223.17,
+      "priceEur": 207,
+      "priceRub": 20964.7323,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "11842817",
+      "priceUsd": 226,
+      "priceEur": 203.38,
+      "priceRub": 20598.1598,
+      "currency": "Dollar"
+    },
+    {
+      "leadId": "15822041",
+      "priceUsd": 300,
+      "priceEur": 269.97,
+      "priceRub": 27342.690000000002,
+      "currency": "Dollar"
+    },
+    {
+      "leadId": "25808155",
+      "priceUsd": 221.52,
+      "priceEur": 199.35,
+      "priceRub": 20189.948715,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "26607861",
+      "priceUsd": 1600.15,
+      "priceEur": 1440,
+      "priceRub": 145841.61599999998,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "26346285",
+      "priceUsd": 544.5,
+      "priceEur": 490,
+      "priceRub": 49626.661,
+      "currency": "Euro"
+    },
+    {
+      "leadId": "9913383",
+      "priceUsd": 230.5,
+      "priceEur": 207.43,
+      "priceRub": 21008.300150000003,
+      "currency": "Dollar"
+    },
+    {
+      "leadId": "25623373",
+      "priceUsd": 544.5,
+      "priceEur": 490,
+      "priceRub": 49626.661,
+      "currency": "Euro"
+    }
+  ]
+}

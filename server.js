@@ -73,6 +73,61 @@ app.get('/status', async (req, res) => {
     }
 });
 
+// Test endpoint для проверки авторизации AmoCRM
+app.get('/test-auth', async (req, res) => {
+    try {
+        console.log('Тестирование авторизации AmoCRM...');
+        
+        // Проверяем переменные окружения
+        if (!amoCRMToken || !amoCRMSubdomain) {
+            return res.status(500).json({
+                error: 'Missing environment variables',
+                details: {
+                    ACCESS_TOKEN: amoCRMToken ? 'Set' : 'NOT SET',
+                    SUBDOMAIN: amoCRMSubdomain ? 'Set' : 'NOT SET'
+                }
+            });
+        }
+        
+        // Пробуем получить информацию об аккаунте
+        const accountUrl = `https://${amoCRMSubdomain}.amocrm.ru/api/v4/account`;
+        console.log(`Запрос к: ${accountUrl}`);
+        
+        const response = await axios.get(accountUrl, {
+            headers: {
+                'Authorization': `Bearer ${amoCRMToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        res.status(200).json({
+            status: 'success',
+            message: 'AmoCRM authorization successful',
+            account: {
+                id: response.data.id,
+                name: response.data.name,
+                subdomain: response.data.subdomain
+            }
+        });
+    } catch (error) {
+        console.error('Ошибка тестирования авторизации:', error.response?.data || error.message);
+        
+        res.status(error.response?.status || 500).json({
+            status: 'error',
+            message: 'AmoCRM authorization failed',
+            error: {
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                data: error.response?.data,
+                message: error.message
+            },
+            hint: error.response?.status === 403 ? 
+                'Check if ACCESS_TOKEN is valid and not expired' : 
+                'Check environment variables and network connectivity'
+        });
+    }
+});
+
 // ===== СУЩЕСТВУЮЩИЕ ФУНКЦИИ =====
 
 // Функция для получения курса валют
@@ -93,12 +148,27 @@ const getExchangeRates = async () => {
 // Функция для получения данных о сделке
 const getLeadDetails = async (leadId) => {
     try {
-        const response = await axios.get(`https://${amoCRMSubdomain}.amocrm.ru/api/v4/leads/${leadId}`, {
-            headers: { 'Authorization': `Bearer ${amoCRMToken}` }
+        const url = `https://${amoCRMSubdomain}.amocrm.ru/api/v4/leads/${leadId}`;
+        console.log(`Запрос к AmoCRM API: ${url}`);
+        
+        const response = await axios.get(url, {
+            headers: { 
+                'Authorization': `Bearer ${amoCRMToken}`,
+                'Content-Type': 'application/json'
+            }
         });
         return response.data;
     } catch (error) {
-        console.error(`Ошибка получения данных сделки ${leadId}:`, error.response?.data || error.message);
+        console.error(`Ошибка получения данных сделки ${leadId}:`);
+        console.error(`URL: https://${amoCRMSubdomain}.amocrm.ru/api/v4/leads/${leadId}`);
+        console.error(`Status: ${error.response?.status}`);
+        console.error(`Response:`, error.response?.data || error.message);
+        
+        if (error.response?.status === 403) {
+            console.error('403 Forbidden - Проверьте ACCESS_TOKEN в переменных окружения');
+            console.error('Токен может быть истекшим или недействительным');
+        }
+        
         throw new Error('Не удалось получить данные о сделке');
     }
 };
@@ -270,7 +340,20 @@ const processLead = async (leadId, usdRate, eurRate) => {
 // Обработка вебхука
 app.post('/webhook', async (req, res) => {
     try {
+        console.log('Получен вебхук:', JSON.stringify(req.body, null, 2));
+        
+        // Проверяем наличие данных о сделках
+        if (!req.body || !req.body.leads || !req.body.leads.update) {
+            console.log('Вебхук не содержит данных об обновлении сделок');
+            return res.status(200).send('OK - No leads to process');
+        }
+        
         const leadUpdates = req.body.leads.update;
+        
+        if (!Array.isArray(leadUpdates) || leadUpdates.length === 0) {
+            console.log('Массив обновлений сделок пуст');
+            return res.status(200).send('OK - Empty updates array');
+        }
 
         for (const leadUpdate of leadUpdates) {
             const leadId = leadUpdate.id;
@@ -287,14 +370,36 @@ app.post('/webhook', async (req, res) => {
         res.send('Webhook обработан успешно');
     } catch (error) {
         console.error('Ошибка обработки вебхука:', error.message, error.stack);
-        res.status(500).send('Ошибка обработки вебхука');
+        
+        // Всегда возвращаем 200, чтобы AmoCRM не повторял вебхук
+        res.status(200).send('Webhook received with error');
     }
 });
 
 // Запуск сервера
 const PORT = process.env.PORT || 3000;
+
+// Проверка переменных окружения при запуске
+if (!amoCRMToken || !amoCRMSubdomain) {
+    console.error('ОШИБКА: Отсутствуют необходимые переменные окружения!');
+    console.error(`ACCESS_TOKEN: ${amoCRMToken ? 'Установлен' : 'НЕ УСТАНОВЛЕН'}`);
+    console.error(`SUBDOMAIN: ${amoCRMSubdomain ? 'Установлен' : 'НЕ УСТАНОВЛЕН'}`);
+    
+    if (!amoCRMToken) {
+        console.error('Необходимо установить ACCESS_TOKEN в переменных окружения Render');
+    }
+    if (!amoCRMSubdomain) {
+        console.error('Необходимо установить SUBDOMAIN в переменных окружения Render');
+    }
+} else {
+    console.log('Переменные окружения загружены успешно');
+    console.log(`SUBDOMAIN: ${amoCRMSubdomain}`);
+    console.log(`ACCESS_TOKEN: ${amoCRMToken.substring(0, 10)}...${amoCRMToken.substring(amoCRMToken.length - 5)}`);
+}
+
 app.listen(PORT, () => {
     console.log(`Сервер запущен на порту ${PORT}`);
     console.log(`Health check доступен по адресу: http://localhost:${PORT}/`);
     console.log(`Status endpoint: http://localhost:${PORT}/status`);
+    console.log(`Test auth endpoint: http://localhost:${PORT}/test-auth`);
 });

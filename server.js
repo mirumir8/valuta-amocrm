@@ -128,7 +128,103 @@ app.get('/test-auth', async (req, res) => {
     }
 });
 
-// ===== СУЩЕСТВУЮЩИЕ ФУНКЦИИ =====
+// Test endpoint для проверки прав на обновление сделок
+app.get('/test-update-permission', async (req, res) => {
+    try {
+        console.log('Тестирование прав на обновление сделок...');
+        
+        // Сначала проверяем авторизацию
+        const accountUrl = `https://${amoCRMSubdomain}.amocrm.ru/api/v4/account`;
+        const accountResponse = await axios.get(accountUrl, {
+            headers: {
+                'Authorization': `Bearer ${amoCRMToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        // Проверяем права доступа через account endpoint
+        const rights = accountResponse.data._embedded?.users?.find(user => user.id === accountResponse.data.current_user_id)?.rights;
+        
+        res.status(200).json({
+            status: 'success',
+            message: 'Authorization check completed',
+            account: {
+                id: accountResponse.data.id,
+                name: accountResponse.data.name,
+                subdomain: accountResponse.data.subdomain,
+                current_user_id: accountResponse.data.current_user_id
+            },
+            rights: rights || 'Unable to determine rights',
+            note: 'To fully test update permissions, use the /test-update-lead/{leadId} endpoint'
+        });
+    } catch (error) {
+        console.error('Ошибка проверки прав:', error.response?.data || error.message);
+        
+        res.status(error.response?.status || 500).json({
+            status: 'error',
+            message: 'Permission check failed',
+            error: {
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                data: error.response?.data
+            },
+            hints: [
+                'Ensure ACCESS_TOKEN has permission to edit leads',
+                'Check integration settings in AmoCRM',
+                'Token may need to be regenerated with proper permissions'
+            ]
+        });
+    }
+});
+
+// Test endpoint для проверки доступа к сделкам
+app.get('/test-leads-access', async (req, res) => {
+    try {
+        console.log('Тестирование доступа к сделкам...');
+        
+        // Пробуем получить список сделок (первые 3)
+        const leadsUrl = `https://${amoCRMSubdomain}.amocrm.ru/api/v4/leads?limit=3`;
+        console.log(`Запрос к: ${leadsUrl}`);
+        
+        const response = await axios.get(leadsUrl, {
+            headers: {
+                'Authorization': `Bearer ${amoCRMToken}`,
+                'Content-Type': 'application/json',
+                'User-Agent': 'amoCRM-oAuth-client/1.0'
+            }
+        });
+        
+        const leads = response.data._embedded?.leads || [];
+        
+        res.status(200).json({
+            status: 'success',
+            message: 'Successfully accessed leads',
+            leads_count: leads.length,
+            sample_lead: leads[0] ? {
+                id: leads[0].id,
+                name: leads[0].name,
+                price: leads[0].price
+            } : null,
+            permissions: {
+                read_leads: true,
+                update_leads: 'To test update, try modifying a lead'
+            }
+        });
+    } catch (error) {
+        console.error('Ошибка доступа к сделкам:', error.response?.data || error.message);
+        
+        res.status(error.response?.status || 500).json({
+            status: 'error',
+            message: 'Failed to access leads',
+            error: {
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                data: error.response?.data
+            },
+            hint: 'If you can\'t read leads, you likely can\'t update them either'
+        });
+    }
+});
 
 // ВАЖНО: Данные о сделке теперь берутся напрямую из вебхука, 
 // что решает проблему с 403 Forbidden при попытке получить данные через API
@@ -183,19 +279,55 @@ const updateLead = async (leadId, customFieldsToUpdate, price) => {
     try {
         // Преобразуем значение `price` в целое число
         const priceAsInt = Math.round(price);
-
-        await axios.patch(`https://${amoCRMSubdomain}.amocrm.ru/api/v4/leads/${leadId}`, {
-            custom_fields_values: customFieldsToUpdate,
+        
+        const url = `https://${amoCRMSubdomain}.amocrm.ru/api/v4/leads/${leadId}`;
+        
+        // Создаем массив для обновления в правильном формате
+        const updateData = {
             price: priceAsInt
-        }, {
+        };
+        
+        // Добавляем custom_fields_values только если есть что обновлять
+        if (customFieldsToUpdate && customFieldsToUpdate.length > 0) {
+            updateData.custom_fields_values = customFieldsToUpdate;
+        }
+        
+        console.log(`Обновление сделки ${leadId}:`);
+        console.log(`URL: ${url}`);
+        console.log(`Данные для обновления:`, JSON.stringify(updateData, null, 2));
+
+        const response = await axios.patch(url, updateData, {
             headers: {
                 'Authorization': `Bearer ${amoCRMToken}`,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'User-Agent': 'amoCRM-oAuth-client/1.0'  // Добавляем User-Agent
             }
         });
+        
         console.log(`Сделка ${leadId} успешно обновлена с ценой ${priceAsInt}.`);
+        console.log(`Ответ сервера:`, response.status);
     } catch (error) {
-        console.error(`Ошибка обновления сделки ${leadId}:`, error.response?.data || error.message);
+        console.error(`Ошибка обновления сделки ${leadId}:`);
+        console.error(`URL: ${url}`);
+        console.error(`Status: ${error.response?.status}`);
+        console.error(`Status Text: ${error.response?.statusText}`);
+        console.error(`Response:`, error.response?.data || error.message);
+        
+        if (error.response?.status === 403) {
+            console.error('403 Forbidden при обновлении - возможные причины:');
+            console.error('1. Токен не имеет прав на изменение сделок');
+            console.error('2. Интеграция отключена или токен истек');
+            console.error('3. Проверьте права доступа интеграции в AmoCRM');
+            console.error('4. Возможно, сделка заблокирована или у пользователя нет прав на её изменение');
+        }
+        
+        // Логируем заголовки запроса для отладки (без токена)
+        console.error('Заголовки запроса:', {
+            'Authorization': `Bearer ${amoCRMToken ? amoCRMToken.substring(0, 10) + '...' : 'NOT SET'}`,
+            'Content-Type': 'application/json',
+            'User-Agent': 'amoCRM-oAuth-client/1.0'
+        });
+        
         throw new Error('Не удалось обновить сделку');
     }
 };
@@ -251,8 +383,8 @@ const processLead = async (leadData, usdRate, eurRate) => {
     console.log(`Определение основной валюты для сделки ${leadId}: ${selectedCurrency}`);
 
     // Получаем курсы валют из сделки
-    const storedUsdRate = parseFloat(getFieldValue(usdRateFieldId));
-    const storedEurRate = parseFloat(getFieldValue(eurRateFieldId));
+    const storedUsdRate = parseFloat(getFieldValue(usdRateFieldId)) || 0;
+    const storedEurRate = parseFloat(getFieldValue(eurRateFieldId)) || 0;
 
     // Текущие курсы валют
     const currentUsdRate = parseFloat(usdRate.toFixed(4));
@@ -261,10 +393,15 @@ const processLead = async (leadData, usdRate, eurRate) => {
     const epsilonRate = 0.0001; // Допуск для сравнения курсов валют
 
     // Проверяем, изменились ли курсы валют
-    if (Math.abs(storedUsdRate - currentUsdRate) < epsilonRate && Math.abs(storedEurRate - currentEurRate) < epsilonRate) {
-        console.log(`Сделка ${leadId}: Курсы валют не изменились.`);
-    } else {
+    const ratesChanged = Math.abs(storedUsdRate - currentUsdRate) >= epsilonRate || 
+                        Math.abs(storedEurRate - currentEurRate) >= epsilonRate;
+    
+    if (ratesChanged) {
         console.log(`Сделка ${leadId}: Курсы валют изменились или отсутствуют, требуется обновление.`);
+        console.log(`  Старые курсы: USD=${storedUsdRate}, EUR=${storedEurRate}`);
+        console.log(`  Новые курсы: USD=${currentUsdRate}, EUR=${currentEurRate}`);
+    } else {
+        console.log(`Сделка ${leadId}: Курсы валют не изменились.`);
     }
 
     let customFieldsToUpdate = [];
@@ -280,22 +417,21 @@ const processLead = async (leadData, usdRate, eurRate) => {
 
         const epsilonValue = 0.01; // Допуск для сравнения цен
 
-        if (
-            Math.abs(storedEurValue - calculatedEurValue) < epsilonValue &&
-            Math.abs(storedUsdRate - currentUsdRate) < epsilonRate &&
-            Math.abs(storedEurRate - currentEurRate) < epsilonRate
-        ) {
+        if (Math.abs(storedEurValue - calculatedEurValue) < epsilonValue) {
             console.log(`Сделка ${leadId}: Значения не изменились, обработка не требуется.`);
             return;
         }
 
         customFieldsToUpdate.push({ field_id: eurFieldId, values: [{ value: calculatedEurValue }] });
 
-        // Обновляем курсы валют
+        // ВАЖНО: Не обновляем курсы валют напрямую - они могут быть readonly
+        // Закомментируем обновление курсов и посмотрим, работает ли обновление без них
+        /*
         customFieldsToUpdate.push(
             { field_id: eurRateFieldId, values: [{ value: currentEurRate }] },
             { field_id: usdRateFieldId, values: [{ value: currentUsdRate }] }
         );
+        */
 
         console.log(`Сделка ${leadId}: Пересчитанные значения - EUR = ${calculatedEurValue}, RUB = ${Math.round(newPriceInRub)}`);
     } else if (selectedCurrency === 'Euro') {
@@ -308,22 +444,20 @@ const processLead = async (leadData, usdRate, eurRate) => {
 
         const epsilonValue = 0.01; // Допуск для сравнения цен
 
-        if (
-            Math.abs(storedUsdValue - calculatedUsdValue) < epsilonValue &&
-            Math.abs(storedUsdRate - currentUsdRate) < epsilonRate &&
-            Math.abs(storedEurRate - currentEurRate) < epsilonRate
-        ) {
+        if (Math.abs(storedUsdValue - calculatedUsdValue) < epsilonValue) {
             console.log(`Сделка ${leadId}: Значения не изменились, обработка не требуется.`);
             return;
         }
 
         customFieldsToUpdate.push({ field_id: usdFieldId, values: [{ value: calculatedUsdValue }] });
 
-        // Обновляем курсы валют
+        // ВАЖНО: Не обновляем курсы валют напрямую - они могут быть readonly
+        /*
         customFieldsToUpdate.push(
             { field_id: eurRateFieldId, values: [{ value: currentEurRate }] },
             { field_id: usdRateFieldId, values: [{ value: currentUsdRate }] }
         );
+        */
 
         console.log(`Сделка ${leadId}: Пересчитанные значения - USD = ${calculatedUsdValue}, RUB = ${Math.round(newPriceInRub)}`);
     } else if (selectedCurrency === 'Рубли') {
@@ -340,9 +474,7 @@ const processLead = async (leadData, usdRate, eurRate) => {
 
         if (
             Math.abs(storedUsdValue - calculatedUsdValue) < epsilonValue &&
-            Math.abs(storedEurValue - calculatedEurValue) < epsilonValue &&
-            Math.abs(storedUsdRate - currentUsdRate) < epsilonRate &&
-            Math.abs(storedEurRate - currentEurRate) < epsilonRate
+            Math.abs(storedEurValue - calculatedEurValue) < epsilonValue
         ) {
             console.log(`Сделка ${leadId}: Значения не изменились, обработка не требуется.`);
             return;
@@ -353,11 +485,13 @@ const processLead = async (leadData, usdRate, eurRate) => {
             { field_id: eurFieldId, values: [{ value: calculatedEurValue }] }
         );
 
-        // Обновляем курсы валют
+        // ВАЖНО: Не обновляем курсы валют напрямую - они могут быть readonly
+        /*
         customFieldsToUpdate.push(
             { field_id: eurRateFieldId, values: [{ value: currentEurRate }] },
             { field_id: usdRateFieldId, values: [{ value: currentUsdRate }] }
         );
+        */
 
         console.log(`Сделка ${leadId}: Пересчитанные значения - USD = ${calculatedUsdValue}, EUR = ${calculatedEurValue}`);
     } else {
@@ -368,7 +502,45 @@ const processLead = async (leadData, usdRate, eurRate) => {
     console.log(`Сделка ${leadId}: Попытка обновления полей.`);
 
     // Обновляем сделку
-    await updateLead(leadId, customFieldsToUpdate, newPriceInRub);
+    // Попробуем обновить сначала только цену, а потом поля
+    try {
+        // Сначала обновляем только цену
+        await updateLead(leadId, [], newPriceInRub);
+        console.log(`Сделка ${leadId}: Цена обновлена успешно`);
+        
+        // Затем обновляем custom fields если есть что обновлять
+        if (customFieldsToUpdate.length > 0) {
+            await updateLead(leadId, customFieldsToUpdate, newPriceInRub);
+            console.log(`Сделка ${leadId}: Кастомные поля обновлены успешно`);
+        }
+    } catch (error) {
+        console.error(`Сделка ${leadId}: Не удалось обновить. Пробуем альтернативный метод...`);
+        
+        // Альтернативный метод - обновляем только кастомные поля без цены
+        try {
+            if (customFieldsToUpdate.length > 0) {
+                const url = `https://${amoCRMSubdomain}.amocrm.ru/api/v4/leads/${leadId}`;
+                const updateData = {
+                    custom_fields_values: customFieldsToUpdate
+                };
+                
+                console.log(`Альтернативное обновление сделки ${leadId}:`, JSON.stringify(updateData, null, 2));
+                
+                await axios.patch(url, updateData, {
+                    headers: {
+                        'Authorization': `Bearer ${amoCRMToken}`,
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'amoCRM-oAuth-client/1.0'
+                    }
+                });
+                
+                console.log(`Сделка ${leadId}: Кастомные поля обновлены через альтернативный метод`);
+            }
+        } catch (altError) {
+            console.error(`Сделка ${leadId}: Альтернативный метод также не сработал`);
+            throw altError;
+        }
+    }
 };
 
 // Обработка вебхука
@@ -433,7 +605,11 @@ if (!amoCRMToken || !amoCRMSubdomain) {
 
 app.listen(PORT, () => {
     console.log(`Сервер запущен на порту ${PORT}`);
-    console.log(`Health check доступен по адресу: http://localhost:${PORT}/`);
-    console.log(`Status endpoint: http://localhost:${PORT}/status`);
-    console.log(`Test auth endpoint: http://localhost:${PORT}/test-auth`);
+    console.log(`\nДоступные endpoints:`);
+    console.log(`- Health check: http://localhost:${PORT}/`);
+    console.log(`- Status: http://localhost:${PORT}/status`);
+    console.log(`- Test auth: http://localhost:${PORT}/test-auth`);
+    console.log(`- Test permissions: http://localhost:${PORT}/test-update-permission`);
+    console.log(`- Test leads access: http://localhost:${PORT}/test-leads-access`);
+    console.log(`- Debug integration: http://localhost:${PORT}/debug-integration`);
 });

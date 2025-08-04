@@ -130,6 +130,9 @@ app.get('/test-auth', async (req, res) => {
 
 // ===== СУЩЕСТВУЮЩИЕ ФУНКЦИИ =====
 
+// ВАЖНО: Данные о сделке теперь берутся напрямую из вебхука, 
+// что решает проблему с 403 Forbidden при попытке получить данные через API
+
 // Функция для получения курса валют
 const getExchangeRates = async () => {
     try {
@@ -146,6 +149,8 @@ const getExchangeRates = async () => {
 };
 
 // Функция для получения данных о сделке
+// ВАЖНО: Эта функция больше не используется, так как все данные приходят в вебхуке
+// Оставлена для возможного будущего использования или если понадобится получать дополнительные данные
 const getLeadDetails = async (leadId) => {
     try {
         const url = `https://${amoCRMSubdomain}.amocrm.ru/api/v4/leads/${leadId}`;
@@ -196,24 +201,53 @@ const updateLead = async (leadId, customFieldsToUpdate, price) => {
 };
 
 // Функция для обработки сделки
-const processLead = async (leadId, usdRate, eurRate) => {
-    const lead = await getLeadDetails(leadId);
+const processLead = async (leadData, usdRate, eurRate) => {
+    // Теперь используем данные напрямую из вебхука
+    const leadId = leadData.id;
+    const lead = {
+        id: leadData.id,
+        price: parseInt(leadData.price) || 0,  // Преобразуем строку в число
+        custom_fields_values: leadData.custom_fields ? leadData.custom_fields.map(field => ({
+            field_id: parseInt(field.id),  // Преобразуем ID в число
+            values: field.values
+        })) : []
+    };
     const customFields = lead.custom_fields_values || [];
 
     // Функция для получения текущих значений полей (может вернуть null)
     const getFieldValue = (fieldId) => {
         const field = customFields.find(f => f.field_id === fieldId);
-        return field?.values?.[0]?.value ? field.values[0].value : null;
+        if (!field || !field.values || field.values.length === 0) return null;
+        
+        // Обработка разных форматов values из вебхука
+        const firstValue = field.values[0];
+        let value;
+        
+        // Если это объект с полем value
+        if (typeof firstValue === 'object' && firstValue.value !== undefined) {
+            value = firstValue.value;
+        } else {
+            // Если это просто значение (например, для дат)
+            value = firstValue;
+        }
+        
+        // Если это строка с числом и пробелами (например, "5 250"), убираем пробелы
+        if (typeof value === 'string' && /^\d[\d\s]*$/.test(value)) {
+            value = value.replace(/\s/g, '');
+        }
+        
+        return value;
     };
 
     const currencyField = customFields.find(field => field.field_id === currencyFieldId);
 
-    if (!currencyField || !currencyField.values || !currencyField.values[0]?.value) {
+    if (!currencyField || !currencyField.values || currencyField.values.length === 0) {
         console.log(`Поле Currency отсутствует в сделке ${leadId}.`);
         return;
     }
 
-    const selectedCurrency = currencyField.values[0].value;
+    // Получаем значение валюты из формата вебхука
+    const selectedCurrency = currencyField.values[0].value || currencyField.values[0];
     console.log(`Определение основной валюты для сделки ${leadId}: ${selectedCurrency}`);
 
     // Получаем курсы валют из сделки
@@ -363,8 +397,8 @@ app.post('/webhook', async (req, res) => {
             // Получаем текущие курсы валют
             const { usdRate, eurRate } = await getExchangeRates();
 
-            // Обрабатываем сделку
-            await processLead(leadId, usdRate, eurRate);
+            // Обрабатываем сделку, передавая полные данные из вебхука
+            await processLead(leadUpdate, usdRate, eurRate);
         }
 
         res.send('Webhook обработан успешно');

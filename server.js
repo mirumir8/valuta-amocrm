@@ -17,8 +17,8 @@ const exchangeRateApiUrl = "https://www.cbr-xml-daily.ru/daily_json.js";
 const usdFieldId = 600679;           // "Price $"
 const eurFieldId = 600681;           // "Price €"
 const currencyFieldId = 602137;      // "Currency"
-const eurRateFieldId = 600167;       // Курс EUR
-const usdRateFieldId = 600169;       // Курс USD
+const eurRateFieldId = 600167;       // Курс EUR (не обновляем)
+const usdRateFieldId = 600169;       // Курс USD (не обновляем)
 
 // ===== GET ENDPOINTS ДЛЯ ПИНГА И МОНИТОРИНГА =====
 // Главная страница - для пинга от UptimeRobot
@@ -229,27 +229,27 @@ const getExchangeRates = async () => {
 };
 
 // Функция для обновления сделки
-// ИСПРАВЛЕНО: url объявлен в начале функции
+// ИСПРАВЛЕНО: url объявлен в начале блока try
 const updateLead = async (leadId, customFieldsToUpdate, price) => {
-    // Объявляем url в начале функции, чтобы он был доступен везде, включая блок catch
+    // Объявляем url здесь, чтобы он был доступен в блоке catch даже если произойдет ошибка до его инициализации
     let url;
     try {
         // Преобразуем значение `price` в целое число
         const priceAsInt = Math.round(price);
-        url = `https://${amoCRMSubdomain}.amocrm.ru/api/v4/leads/${leadId}`; // Присваиваем значение
+        url = `https://${amoCRMSubdomain}.amocrm.ru/api/v4/leads/${leadId}`; // Инициализируем url
 
         // Создаем объект данных для обновления
-        const updateData = {
-            price: priceAsInt
-        };
-        // Добавляем custom_fields_values только если есть что обновлять
+        const updateData = {};
+        if (price !== undefined) {
+            updateData.price = priceAsInt;
+        }
         if (customFieldsToUpdate && customFieldsToUpdate.length > 0) {
             updateData.custom_fields_values = customFieldsToUpdate;
         }
 
         if (Object.keys(updateData).length === 0) {
-             console.log(`Сделка ${leadId}: Нет данных для обновления.`);
-             return;
+            console.log(`Сделка ${leadId}: Нет данных для обновления.`);
+            return;
         }
 
         console.log(`Обновление сделки ${leadId}:`);
@@ -271,22 +271,23 @@ const updateLead = async (leadId, customFieldsToUpdate, price) => {
         console.error(`Status: ${error.response?.status}`);
         console.error(`Status Text: ${error.response?.statusText}`);
         console.error(`Response:`, error.response?.data || error.message);
-        
+
         if (error.response?.status === 403) {
             console.error('403 Forbidden при обновлении - возможные причины:');
             console.error('1. Токен не имеет прав на изменение сделок');
             console.error('2. Интеграция отключена или токен истек');
             console.error('3. Проверьте права доступа интеграции в AmoCRM');
             console.error('4. Возможно, сделка заблокирована или у пользователя нет прав на её изменение');
+            console.error('5. Попытка обновить readonly-поля (например, курсов)');
         }
-        
+
         // Логируем заголовки запроса для отладки (без токена)
         console.error('Заголовки запроса:', {
             'Authorization': `Bearer ${amoCRMToken ? amoCRMToken.substring(0, 10) + '...' : 'NOT SET'}`,
             'Content-Type': 'application/json',
             'User-Agent': 'amoCRM-oAuth-client/1.0'
         });
-        
+
         throw new Error(`Не удалось обновить сделку ${leadId}`);
     }
 };
@@ -306,24 +307,27 @@ const processLead = async (leadData, usdRate, eurRate) => {
 
     const customFields = lead.custom_fields_values || [];
 
-    // Функция для получения текущих значений полей из данных вебхука
+    // Функция для получения текущих значений полей (может вернуть null)
     const getFieldValue = (fieldId) => {
         const field = customFields.find(f => f.field_id === fieldId);
         if (!field || !field.values || field.values.length === 0) return null;
+        // Обработка разных форматов values из вебхука
         const firstValue = field.values[0];
         let value;
+        // Если это объект с полем value
         if (typeof firstValue === 'object' && firstValue.value !== undefined) {
             value = firstValue.value;
         } else {
+            // Если это просто значение (например, для дат)
             value = firstValue;
         }
+        // Если это строка с числом и пробелами (например, "5 250"), убираем пробелы
         if (typeof value === 'string' && /^\d[\d\s]*$/.test(value)) {
             value = value.replace(/\s/g, '');
         }
         return value;
     };
 
-    // Проверка наличия поля валюты
     const currencyField = customFields.find(field => field.field_id === currencyFieldId);
     if (!currencyField || !currencyField.values || currencyField.values.length === 0) {
         console.log(`Поле Currency отсутствует в сделке ${leadId}.`);
@@ -342,7 +346,7 @@ const processLead = async (leadData, usdRate, eurRate) => {
     const currentUsdRate = parseFloat(usdRate.toFixed(4));
     const currentEurRate = parseFloat(eurRate.toFixed(4));
 
-    const epsilonRate = 0.0001;
+    const epsilonRate = 0.0001; // Допуск для сравнения курсов валют
 
     // Проверяем, изменились ли курсы валют
     const ratesChanged = Math.abs(storedUsdRate - currentUsdRate) >= epsilonRate ||
@@ -357,106 +361,65 @@ const processLead = async (leadData, usdRate, eurRate) => {
     console.log(`  Старые курсы: USD=${storedUsdRate}, EUR=${storedEurRate}`);
     console.log(`  Новые курсы: USD=${currentUsdRate}, EUR=${currentEurRate}`);
 
+    let customFieldsToUpdate = [];
     let newPriceInRub = 0;
-    let calculatedUsdValue = null;
-    let calculatedEurValue = null;
 
     if (selectedCurrency === 'Dollar') {
         const priceInUsd = parseFloat(getFieldValue(usdFieldId)) || 0;
         newPriceInRub = priceInUsd * usdRate;
         const budgetInEur = priceInUsd * (usdRate / eurRate);
-        calculatedEurValue = parseFloat(budgetInEur.toFixed(2));
+        const calculatedEurValue = parseFloat(budgetInEur.toFixed(2));
 
         const storedEurValue = parseFloat(getFieldValue(eurFieldId)) || 0;
-        const epsilonValue = 0.01;
+        const epsilonValue = 0.01; // Допуск для сравнения цен
 
         if (Math.abs(storedEurValue - calculatedEurValue) < epsilonValue) {
             console.log(`Сделка ${leadId}: Значения не изменились, обработка не требуется.`);
             return;
         }
 
-        // Подготовка обновления полей
-        let customFieldsToUpdate = [];
         customFieldsToUpdate.push({ field_id: eurFieldId, values: [{ value: calculatedEurValue }] });
         // ВАЖНО: Не обновляем курсы валют напрямую - они могут быть readonly
-        /*
-        customFieldsToUpdate.push(
-            { field_id: eurRateFieldId, values: [{ value: currentEurRate }] },
-            { field_id: usdRateFieldId, values: [{ value: currentUsdRate }] }
-        );
-        */
+        // customFieldsToUpdate.push(
+        //     { field_id: eurRateFieldId, values: [{ value: currentEurRate }] },
+        //     { field_id: usdRateFieldId, values: [{ value: currentUsdRate }] }
+        // );
         console.log(`Сделка ${leadId}: Пересчитанные значения - EUR = ${calculatedEurValue}, RUB = ${Math.round(newPriceInRub)}`);
-
-        // Обновляем сделку
-        try {
-            // Сначала обновляем только цену
-            await updateLead(leadId, [], newPriceInRub);
-            console.log(`Сделка ${leadId}: Цена обновлена успешно до ${Math.round(newPriceInRub)}.`);
-
-            // Затем обновляем custom fields если есть что обновлять
-            if (customFieldsToUpdate.length > 0) {
-                await updateLead(leadId, customFieldsToUpdate, newPriceInRub);
-                console.log(`Сделка ${leadId}: Кастомные поля обновлены успешно.`);
-            }
-        } catch (error) {
-            console.error(`Сделка ${leadId}: Ошибка при обновлении.`, error.message);
-            throw error;
-        }
 
     } else if (selectedCurrency === 'Euro') {
         const priceInEur = parseFloat(getFieldValue(eurFieldId)) || 0;
         newPriceInRub = priceInEur * eurRate;
         const budgetInUsd = priceInEur * (eurRate / usdRate);
-        calculatedUsdValue = parseFloat(budgetInUsd.toFixed(2));
+        const calculatedUsdValue = parseFloat(budgetInUsd.toFixed(2));
 
         const storedUsdValue = parseFloat(getFieldValue(usdFieldId)) || 0;
-        const epsilonValue = 0.01;
+        const epsilonValue = 0.01; // Допуск для сравнения цен
 
         if (Math.abs(storedUsdValue - calculatedUsdValue) < epsilonValue) {
             console.log(`Сделка ${leadId}: Значения не изменились, обработка не требуется.`);
             return;
         }
 
-        // Подготовка обновления полей
-        let customFieldsToUpdate = [];
         customFieldsToUpdate.push({ field_id: usdFieldId, values: [{ value: calculatedUsdValue }] });
         // ВАЖНО: Не обновляем курсы валют напрямую - они могут быть readonly
-        /*
-        customFieldsToUpdate.push(
-            { field_id: eurRateFieldId, values: [{ value: currentEurRate }] },
-            { field_id: usdRateFieldId, values: [{ value: currentUsdRate }] }
-        );
-        */
+        // customFieldsToUpdate.push(
+        //     { field_id: eurRateFieldId, values: [{ value: currentEurRate }] },
+        //     { field_id: usdRateFieldId, values: [{ value: currentUsdRate }] }
+        // );
         console.log(`Сделка ${leadId}: Пересчитанные значения - USD = ${calculatedUsdValue}, RUB = ${Math.round(newPriceInRub)}`);
-
-        // Обновляем сделку
-        try {
-            // Сначала обновляем только цену
-            await updateLead(leadId, [], newPriceInRub);
-            console.log(`Сделка ${leadId}: Цена обновлена успешно до ${Math.round(newPriceInRub)}.`);
-
-            // Затем обновляем custom fields если есть что обновлять
-            if (customFieldsToUpdate.length > 0) {
-                await updateLead(leadId, customFieldsToUpdate, newPriceInRub);
-                console.log(`Сделка ${leadId}: Кастомные поля обновлены успешно.`);
-            }
-        } catch (error) {
-            console.error(`Сделка ${leadId}: Ошибка при обновлении.`, error.message);
-            throw error;
-        }
 
     } else if (selectedCurrency === 'Рубли') {
         newPriceInRub = lead.price || 0;
         const budgetInUsd = newPriceInRub / usdRate;
         const budgetInEur = newPriceInRub / eurRate;
 
-        calculatedUsdValue = parseFloat(budgetInUsd.toFixed(2));
-        calculatedEurValue = parseFloat(budgetInEur.toFixed(2));
+        const calculatedUsdValue = parseFloat(budgetInUsd.toFixed(2));
+        const calculatedEurValue = parseFloat(budgetInEur.toFixed(2));
 
         const storedUsdValue = parseFloat(getFieldValue(usdFieldId)) || 0;
         const storedEurValue = parseFloat(getFieldValue(eurFieldId)) || 0;
 
-        const epsilonValue = 0.01;
+        const epsilonValue = 0.01; // Допуск для сравнения цен
 
         if (
             Math.abs(storedUsdValue - calculatedUsdValue) < epsilonValue &&
@@ -466,45 +429,41 @@ const processLead = async (leadData, usdRate, eurRate) => {
             return;
         }
 
-        // Подготовка обновления полей
-        let customFieldsToUpdate = [];
-        if(calculatedUsdValue !== null) {
-            customFieldsToUpdate.push({ field_id: usdFieldId, values: [{ value: calculatedUsdValue }] });
-            console.log(`Сделка ${leadId}: Подготовлено обновление USD = ${calculatedUsdValue}`);
-        }
-        if(calculatedEurValue !== null) {
-            customFieldsToUpdate.push({ field_id: eurFieldId, values: [{ value: calculatedEurValue }] });
-            console.log(`Сделка ${leadId}: Подготовлено обновление EUR = ${calculatedEurValue}`);
-        }
-        // ВАЖНО: Не обновляем курсы валют напрямую - они могут быть readonly
-        /*
         customFieldsToUpdate.push(
-            { field_id: eurRateFieldId, values: [{ value: currentEurRate }] },
-            { field_id: usdRateFieldId, values: [{ value: currentUsdRate }] }
+            { field_id: usdFieldId, values: [{ value: calculatedUsdValue }] },
+            { field_id: eurFieldId, values: [{ value: calculatedEurValue }] }
         );
-        */
-
-        // Обновляем сделку
-        try {
-            // Сначала обновляем только цену
-            await updateLead(leadId, [], newPriceInRub);
-            console.log(`Сделка ${leadId}: Цена обновлена успешно до ${Math.round(newPriceInRub)}.`);
-
-            // Затем обновляем custom fields если есть что обновлять
-            if (customFieldsToUpdate.length > 0) {
-                await updateLead(leadId, customFieldsToUpdate, newPriceInRub);
-                console.log(`Сделка ${leadId}: Кастомные поля обновлены успешно.`);
-            } else {
-                 console.log(`Сделка ${leadId}: Нет кастомных полей для обновления.`);
-            }
-        } catch (error) {
-            console.error(`Сделка ${leadId}: Ошибка при обновлении.`, error.message);
-            throw error;
-        }
+        // ВАЖНО: Не обновляем курсы валют напрямую - они могут быть readonly
+        // customFieldsToUpdate.push(
+        //     { field_id: eurRateFieldId, values: [{ value: currentEurRate }] },
+        //     { field_id: usdRateFieldId, values: [{ value: currentUsdRate }] }
+        // );
+        console.log(`Сделка ${leadId}: Пересчитанные значения - USD = ${calculatedUsdValue}, EUR = ${calculatedEurValue}`);
 
     } else {
         console.log(`Сделка ${leadId}: Неизвестная валюта, обработка не требуется.`);
         return;
+    }
+
+    console.log(`Сделка ${leadId}: Попытка обновления полей.`);
+
+    // Обновляем сделку
+    try {
+        // Сначала обновляем только цену
+        await updateLead(leadId, [], newPriceInRub);
+        console.log(`Сделка ${leadId}: Цена обновлена успешно до ${Math.round(newPriceInRub)}.`);
+
+        // Затем обновляем custom fields если есть что обновлять
+        if (customFieldsToUpdate.length > 0) {
+            await updateLead(leadId, customFieldsToUpdate, newPriceInRub);
+            console.log(`Сделка ${leadId}: Кастомные поля обновлены успешно.`);
+        } else {
+             console.log(`Сделка ${leadId}: Нет кастомных полей для обновления (кроме цены).`);
+        }
+    } catch (error) {
+        console.error(`Сделка ${leadId}: Ошибка при обновлении.`, error.message);
+        // Перебрасываем ошибку, чтобы вебхук мог её обработать
+        throw error;
     }
 };
 
@@ -565,7 +524,6 @@ if (!amoCRMToken || !amoCRMSubdomain) {
 } else {
     console.log('Переменные окружения загружены успешно');
     console.log(`SUBDOMAIN: ${amoCRMSubdomain}`);
-    // Безопасно скрываем большую часть токена
     console.log(`ACCESS_TOKEN: ${amoCRMToken.substring(0, 10)}...${amoCRMToken.substring(amoCRMToken.length - 5)}`);
 }
 
@@ -579,3 +537,22 @@ app.listen(PORT, () => {
     console.log(`- Test permissions: http://localhost:${PORT}/test-update-permission`);
     console.log(`- Test leads access: http://localhost:${PORT}/test-leads-access`);
 });
+
+// ===== РЕКОМЕНДАЦИИ ПО package.json =====
+/*
+Чтобы избежать предупреждений о версии Node.js и использовать поддерживаемую версию,
+добавьте в ваш package.json следующее:
+
+{
+  "name": "your-project-name",
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=20.15.1 <21.0.0" // ИЛИ ">=22.12.0 <23.0.0" (обе версии являются LTS)
+  },
+  "dependencies": {
+    ...
+  }
+}
+
+Это заставит Render использовать поддерживаемую LTS версию Node.js (20 или 22).
+*/

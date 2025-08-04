@@ -260,7 +260,7 @@ const updateLead = async (leadId, customFieldsToUpdate, price) => {
             headers: {
                 'Authorization': `Bearer ${amoCRMToken}`,
                 'Content-Type': 'application/json',
-                'User-Agent': 'amoCRM-oAuth-client/1.0'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
             }
         });
         console.log(`Сделка ${leadId} успешно обновлена с ценой ${priceAsInt}. Статус: ${response.status}`);
@@ -285,7 +285,7 @@ const updateLead = async (leadId, customFieldsToUpdate, price) => {
         console.error('Заголовки запроса:', {
             'Authorization': `Bearer ${amoCRMToken ? amoCRMToken.substring(0, 10) + '...' : 'NOT SET'}`,
             'Content-Type': 'application/json',
-            'User-Agent': 'amoCRM-oAuth-client/1.0'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
         });
 
         throw new Error(`Не удалось обновить сделку ${leadId}`);

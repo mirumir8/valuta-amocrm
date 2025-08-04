@@ -18,7 +18,62 @@ const eurFieldId = 600681;           // "Price €"
 const currencyFieldId = 602137;      // "Currency"
 const eurRateFieldId = 600167;       // Курс EUR
 const usdRateFieldId = 600169;       // Курс USD
-// Убираем lastUpdateFieldId, так как больше не используем поле даты обновления
+
+// ===== НОВЫЕ GET ENDPOINTS ДЛЯ ПИНГА =====
+
+// Главная страница - для пинга от UptimeRobot
+app.get('/', (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        message: 'AmoCRM Currency Converter is running',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'healthy',
+        service: 'amocrm-currency-converter',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Status endpoint с дополнительной информацией
+app.get('/status', async (req, res) => {
+    try {
+        // Попробуем получить текущие курсы для проверки
+        const { usdRate, eurRate } = await getExchangeRates();
+        
+        res.status(200).json({
+            status: 'operational',
+            service: 'amocrm-currency-converter',
+            rates: {
+                USD: usdRate,
+                EUR: eurRate,
+                source: 'cbr-xml-daily.ru',
+                timestamp: new Date().toISOString()
+            },
+            uptime: process.uptime(),
+            environment: process.env.NODE_ENV || 'production'
+        });
+    } catch (error) {
+        // Даже если не удалось получить курсы, отвечаем 200 для пинга
+        res.status(200).json({
+            status: 'operational',
+            service: 'amocrm-currency-converter',
+            rates: {
+                error: 'Unable to fetch rates',
+                message: error.message
+            },
+            uptime: process.uptime(),
+            environment: process.env.NODE_ENV || 'production'
+        });
+    }
+});
+
+// ===== СУЩЕСТВУЮЩИЕ ФУНКЦИИ =====
 
 // Функция для получения курса валют
 const getExchangeRates = async () => {
@@ -240,4 +295,6 @@ app.post('/webhook', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Сервер запущен на порту ${PORT}`);
+    console.log(`Health check доступен по адресу: http://localhost:${PORT}/`);
+    console.log(`Status endpoint: http://localhost:${PORT}/status`);
 });
